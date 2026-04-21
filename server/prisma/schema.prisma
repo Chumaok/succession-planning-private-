@@ -1,0 +1,211 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(uuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  role         UserRole @default(HR)
+  orgUnitId    String?
+  orgUnit      OrgUnit? @relation(fields: [orgUnitId], references: [id])
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  comments     Comment[]
+  approvals    WorkflowApproval[]
+}
+
+enum UserRole {
+  ADMIN
+  HR
+  MANAGER
+  EXECUTIVE_VIEWER
+}
+
+model OrgUnit {
+  id        String      @id @default(uuid())
+  name      String
+  type      OrgUnitType
+  parentId  String?
+  parent    OrgUnit?    @relation("OrgUnitHierarchy", fields: [parentId], references: [id])
+  children  OrgUnit[]   @relation("OrgUnitHierarchy")
+  positions Position[]
+  employees Employee[]
+  users     User[]
+  createdAt DateTime    @default(now())
+}
+
+enum OrgUnitType {
+  COMPANY
+  REGION
+  DIVISION
+  DEPARTMENT
+  TEAM
+}
+
+model Employee {
+  id                String             @id @default(uuid())
+  name              String
+  email             String             @unique
+  jobTitle          String?
+  orgUnitId         String?
+  orgUnit           OrgUnit?           @relation(fields: [orgUnitId], references: [id])
+  location          String?
+  yearsOfService    Int                @default(0)
+  retirementProfile RetirementProfile?
+  riskAssessments   RiskAssessment[]
+  successions       Successor[]
+  talentPoolMembers TalentPoolMember[]
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+}
+
+model Position {
+  id               String           @id @default(uuid())
+  jobTitle         String
+  orgUnitId        String?
+  orgUnit          OrgUnit?         @relation(fields: [orgUnitId], references: [id])
+  location         String?
+  isCritical       Boolean          @default(false)
+  criticalityLevel CriticalityLevel @default(LOW)
+  description      String?
+  competencies     String[]
+  skills           String[]
+  successors       Successor[]
+  riskAssessments  RiskAssessment[]
+  workflows        WorkflowApproval[]
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+}
+
+enum CriticalityLevel {
+  HIGH
+  MEDIUM
+  LOW
+}
+
+model RiskAssessment {
+  id              String    @id @default(uuid())
+  positionId      String
+  position        Position  @relation(fields: [positionId], references: [id])
+  employeeId      String?
+  employee        Employee? @relation(fields: [employeeId], references: [id])
+  riskLevel       RiskLevel @default(LOW)
+  flightRiskScore Int       @default(0)
+  engagementScore Int       @default(5)
+  marketDemand    String?
+  notes           String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+enum RiskLevel {
+  HIGH
+  MEDIUM
+  LOW
+}
+
+model RetirementProfile {
+  id                String             @id @default(uuid())
+  employeeId        String             @unique
+  employee          Employee           @relation(fields: [employeeId], references: [id])
+  yearsToRetirement Int
+  category          RetirementCategory
+  createdAt         DateTime           @default(now())
+}
+
+enum RetirementCategory {
+  IMMEDIATE
+  MID_TERM
+  LONG_TERM
+}
+
+model Successor {
+  id                  String         @id @default(uuid())
+  employeeId          String
+  employee            Employee       @relation(fields: [employeeId], references: [id])
+  positionId          String
+  position            Position       @relation(fields: [positionId], references: [id])
+  isPrimary           Boolean        @default(false)
+  readinessLevel      ReadinessLevel @default(READY_3_5_YEARS)
+  performanceRating   Int            @default(3)
+  potentialRating     Int            @default(3)
+  strengths           String?
+  developmentAreas    String?
+  leadershipPotential String?
+  mobility            Boolean        @default(false)
+  status              WorkflowStatus @default(DRAFT)
+  comments            Comment[]
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+}
+
+enum ReadinessLevel {
+  READY_NOW
+  READY_1_2_YEARS
+  READY_3_5_YEARS
+}
+
+enum WorkflowStatus {
+  DRAFT
+  REVIEW
+  APPROVAL
+  FINALIZED
+}
+
+model TalentPool {
+  id          String             @id @default(uuid())
+  name        String
+  poolType    PoolType
+  description String?
+  members     TalentPoolMember[]
+  createdAt   DateTime           @default(now())
+}
+
+enum PoolType {
+  ROLE_TYPE
+  SKILL_GROUP
+  LEADERSHIP_TRACK
+}
+
+model TalentPoolMember {
+  id              String     @id @default(uuid())
+  talentPoolId    String
+  talentPool      TalentPool @relation(fields: [talentPoolId], references: [id])
+  employeeId      String
+  employee        Employee   @relation(fields: [employeeId], references: [id])
+  developmentPlan String?
+  trainingProgress Int       @default(0)
+  addedAt         DateTime   @default(now())
+}
+
+model Comment {
+  id          String    @id @default(uuid())
+  successorId String
+  successor   Successor @relation(fields: [successorId], references: [id])
+  authorId    String
+  author      User      @relation(fields: [authorId], references: [id])
+  content     String
+  version     Int       @default(1)
+  createdAt   DateTime  @default(now())
+}
+
+model WorkflowApproval {
+  id         String         @id @default(uuid())
+  entityType String
+  entityId   String
+  positionId String?
+  position   Position?      @relation(fields: [positionId], references: [id])
+  status     WorkflowStatus @default(DRAFT)
+  approverId String?
+  approver   User?          @relation(fields: [approverId], references: [id])
+  notes      String?
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+}
